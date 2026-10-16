@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neurona y costo: mové w y b</title>
+<style>
+:root { --ink:#111; --bg:#fff; --muted:#666; --bad:#c0392b; --ok:#1e7e34; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ink:#eee; --bg:#111; --muted:#aaa; --bad:#ff6b5b; --ok:#5fd37a; } }
+body { margin:0; background:var(--bg); color:var(--ink); font-family:"STIX Two Text",Georgia,serif; }
+.wrap { display:flex; flex-wrap:wrap; gap:28px; padding:20px 16px; max-width:1300px; margin:auto; align-items:flex-start; }
+canvas { background:#fff; }
+#c { width:min(600px,100%); height:auto; aspect-ratio:1; border:1px solid #bbb; }
+.panel { flex:1; min-width:320px; }
+h1 { font-size:28px; margin:0 0 4px; font-weight:600; }
+.sub { color:var(--muted); font-size:19px; margin:0 0 6px; }
+label { display:flex; justify-content:space-between; font-size:26px; margin-top:10px; }
+input[type=range] { width:100%; margin:2px 0 0; }
+.val { font-variant-numeric:tabular-nums; }
+.eq { font-size:23px; margin-top:12px; font-variant-numeric:tabular-nums; }
+.counts { display:flex; gap:36px; flex-wrap:wrap; margin-top:10px; }
+.count { font-size:34px; font-variant-numeric:tabular-nums; }
+.count span { font-weight:700; }
+.plots canvas { width:100%; height:auto; aspect-ratio:3.4; border:1px solid #bbb; margin-top:8px; display:block; }
+.corte { font-size:22px; margin-top:12px; }
+.corte select { font:inherit; font-size:22px; }
+button { font:inherit; font-size:20px; padding:4px 12px; margin:10px 10px 0 0; cursor:pointer; }
+.leyenda { font-size:18px; color:var(--muted); margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <canvas id="c" width="900" height="900"></canvas>
+  <div class="panel">
+    <h1>Mové la recta y mirá el costo</h1>
+    <p class="sub">80 puntos con solapamiento. Clase 1 si <i>w·x + b</i> &gt; 0.</p>
+    <label><span>w<sub>1</sub></span><span class="val" id="v1"></span></label>
+    <input id="s1" type="range" min="-5" max="5" step="0.1">
+    <label><span>w<sub>2</sub></span><span class="val" id="v2"></span></label>
+    <input id="s2" type="range" min="-5" max="5" step="0.1">
+    <label><span>b</span><span class="val" id="vb"></span></label>
+    <input id="sb" type="range" min="-5" max="5" step="0.1">
+    <div class="eq" id="eq"></div>
+    <div class="counts">
+      <div class="count">Errores: <span id="err"></span> de <span id="tot"></span></div>
+      <div class="count">Costo (BCE): <span id="bce"></span></div>
+    </div>
+    <div class="plots">
+      <canvas id="p1" width="1020" height="300"></canvas>
+      <canvas id="p2" width="1020" height="300"></canvas>
+    </div>
+    <div class="corte">Cortar sobre:
+      <select id="cut"><option value="0">w₁</option><option value="1">w₂</option><option value="2">b</option></select>
+      <span class="leyenda">(los otros dos quedan en lo que tengan los sliders)</span>
+    </div>
+    <button id="r0">Valores iniciales</button><button id="r1">Mínimo de la BCE</button>
+    <div class="leyenda">Anillo negro = mal clasificado. Fondo = σ(w·x + b).</div>
+  </div>
+</div>
+<script>
+const D = {"X0": [[1.87, -5.34], [-0.89, -1.97], [-2.37, -1.37], [-5.03, -1.39], [-3.07, 4.65], [-1.22, -1.6], [-2.08, -2.14], [-3.39, -1.66], [-0.78, -1.41], [0.03, -1.34], [-1.56, 1.63], [-0.67, -1.86], [-1.91, -0.08], [1.69, -1.46], [-2.01, 0.7], [-3.11, -1.5], [-0.1, -0.01], [-1.44, 0.14], [-6.41, 0.74], [-3.23, -3.84], [-1.13, 0.19], [-2.36, -2.83], [-1.56, -1.09], [0.79, 0.27], [-1.27, 0.89], [-1.95, -2.57], [-0.61, -0.01], [-1.97, -2.33], [-1.21, -5.24], [-0.43, -0.16], [-4.39, -0.9], [-3.24, 0.29], [-5.06, -2.55], [-0.39, 0.97], [-5.27, -1.85], [-1.04, -2.04], [1.1, -3.03], [-1.0, -2.78], [0.79, -1.04], [-2.23, -3.92]], "X1": [[4.46, 2.48], [2.88, 3.13], [2.19, 0.11], [0.24, -0.16], [3.93, -1.28], [0.59, 0.65], [1.98, 2.18], [-0.52, -1.74], [1.59, 3.26], [2.89, 1.57], [1.06, 1.7], [1.19, 2.59], [0.25, 1.43], [1.41, 2.12], [1.98, 5.54], [4.15, 3.74], [-1.87, 0.62], [0.57, 2.11], [-2.27, 3.2], [3.41, -1.01], [-0.06, -0.16], [1.67, 2.29], [5.08, 0.86], [2.9, 1.46], [4.59, 2.46], [3.93, -0.63], [1.27, -0.18], [4.16, 2.32], [1.08, 0.43], [2.42, 0.01], [0.02, 2.02], [5.79, 0.78], [0.66, -0.79], [-0.67, 2.09], [3.05, 1.22], [2.17, 1.4], [1.84, -1.39], [0.82, 1.39], [0.27, 0.39], [0.21, 0.63]]};
+const pts = D.X0.map(p => ({x:p[0], y:p[1], c:0})).concat(D.X1.map(p => ({x:p[0], y:p[1], c:1})));
+const R = 7;
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const W = cv.width, H = cv.height;
+const px = x => (x + R) / (2*R) * W;
+const py = y => (R - y) / (2*R) * H;
+const S = [document.getElementById("s1"), document.getElementById("s2"), document.getElementById("sb")];
+const NAMES = ["w₁", "w₂", "b"];
+const INIT = [1.0, -0.5, -1.0], OPT = [1.5, 1.1, -0.1];
+const heat = document.createElement("canvas");
+heat.width = heat.height = 90;
+const hctx = heat.getContext("2d");
+const G = 201;
+
+function mix(a, b, t) { return a.map((v, i) => Math.round(v + (b[i] - v) * t)); }
+function cmap(s) {
+  const lo = [59, 76, 192], mid = [221, 221, 221], hi = [180, 4, 38];
+  return s < 0.5 ? mix(lo, mid, s / 0.5) : mix(mid, hi, (s - 0.5) / 0.5);
+}
+const fmt = (v, d = 1) => v.toFixed(d).replace(".", ",").replace("-", "−");
+
+function lossAt(w1, w2, b) {
+  let e = 0, l = 0;
+  for (const p of pts) {
+    const z = w1*p.x + w2*p.y + b;
+    if ((z > 0 ? 1 : 0) !== p.c) e++;
+    l += Math.max(z, 0) + Math.log1p(Math.exp(-Math.abs(z))) - p.c * z;
+  }
+  return [e, l / pts.length];
+}
+
+function plot(canvas, ys, ymax, cur, curY, label, color, dots) {
+  const c = canvas.getContext("2d"), w = canvas.width, h = canvas.height;
+  const L = 110, Rr = 20, T = 20, B = 56;
+  const X = t => L + (t + 5) / 10 * (w - L - Rr);
+  const Y = y => T + (1 - Math.min(y, ymax) / ymax) * (h - T - B);
+  c.clearRect(0, 0, w, h);
+  c.strokeStyle = "#999"; c.lineWidth = 2; c.strokeRect(L, T, w - L - Rr, h - T - B);
+  c.fillStyle = "#222"; c.font = "26px STIX Two Text, Georgia, serif"; c.textAlign = "center";
+  for (const t of [-5, 0, 5]) c.fillText(fmt(t, 0), X(t), h - 24);
+  c.textAlign = "right";
+  c.fillText(fmt(ymax, 0), L - 10, T + 22); c.fillText("0", L - 10, h - B);
+  c.textAlign = "right"; c.fillText(label, w - Rr - 12, T + 32);
+  c.save(); c.beginPath(); c.rect(L, T, w - L - Rr, h - T - B); c.clip();
+  if (dots) {
+    c.fillStyle = color; c.globalAlpha = 0.8;
+    ys.forEach((y, i) => { if (i % 5) return; c.beginPath(); c.arc(X(-5 + 10 * i / (G - 1)), Y(y), 7, 0, 2*Math.PI); c.fill(); });
+  } else {
+    c.strokeStyle = color; c.lineWidth = 5; c.globalAlpha = 0.75; c.beginPath();
+    ys.forEach((y, i) => { const t = -5 + 10 * i / (G - 1); i ? c.lineTo(X(t), Y(y)) : c.moveTo(X(t), Y(y)); });
+    c.stroke();
+  }
+  c.restore();
+  c.globalAlpha = 1; c.fillStyle = "#000"; c.beginPath(); c.arc(X(cur), Y(curY), 12, 0, 2*Math.PI); c.fill();
+}
+
+function draw() {
+  const v = S.map(s => +s.value);
+  const [w1, w2, b] = v;
+  ctx.clearRect(0, 0, W, H);
+  const img = hctx.createImageData(90, 90);
+  for (let j = 0; j < 90; j++) for (let i = 0; i < 90; i++) {
+    const x = -R + (i + 0.5) / 90 * 2*R, y = R - (j + 0.5) / 90 * 2*R;
+    const s = 1 / (1 + Math.exp(-(w1*x + w2*y + b)));
+    const [r, g, bl] = cmap(s);
+    const k = 4 * (j*90 + i);
+    img.data[k] = r; img.data[k+1] = g; img.data[k+2] = bl; img.data[k+3] = 180;
+  }
+  hctx.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(heat, 0, 0, W, H);
+  ctx.strokeStyle = "rgba(0,0,0,0.15)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(px(0), 0); ctx.lineTo(px(0), H); ctx.moveTo(0, py(0)); ctx.lineTo(W, py(0)); ctx.stroke();
+  ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.lineWidth = 6; ctx.beginPath();
+  if (Math.abs(w2) > 1e-9) { ctx.moveTo(px(-R), py((-b + w1*R) / w2)); ctx.lineTo(px(R), py((-b - w1*R) / w2)); ctx.stroke(); }
+  else if (Math.abs(w1) > 1e-9) { ctx.moveTo(px(-b / w1), 0); ctx.lineTo(px(-b / w1), H); ctx.stroke(); }
+
+  for (const p of pts) {
+    const bad = ((w1*p.x + w2*p.y + b) > 0 ? 1 : 0) !== p.c;
+    ctx.beginPath(); ctx.arc(px(p.x), py(p.y), 10, 0, 2*Math.PI);
+    ctx.fillStyle = p.c ? "rgba(214,39,40,0.85)" : "rgba(31,119,180,0.85)";
+    ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#000"; ctx.stroke();
+    if (bad) { ctx.beginPath(); ctx.arc(px(p.x), py(p.y), 17, 0, 2*Math.PI); ctx.lineWidth = 5; ctx.stroke(); }
+  }
+
+  const [e, l] = lossAt(w1, w2, b);
+  document.getElementById("v1").textContent = fmt(w1);
+  document.getElementById("v2").textContent = fmt(w2);
+  document.getElementById("vb").textContent = fmt(b);
+  const sg = x => (x < 0 ? " − " : " + ") + fmt(Math.abs(x));
+  document.getElementById("eq").textContent = fmt(w1) + " · x₁" + sg(w2) + " · x₂" + sg(b) + " = 0";
+  document.getElementById("err").textContent = e;
+  document.getElementById("tot").textContent = pts.length;
+  document.getElementById("bce").textContent = fmt(l, 2);
+
+  const k = +document.getElementById("cut").value;
+  const es = [], ls = [];
+  for (let i = 0; i < G; i++) {
+    const u = v.slice(); u[k] = -5 + 10 * i / (G - 1);
+    const r = lossAt(u[0], u[1], u[2]); es.push(r[0]); ls.push(r[1]);
+  }
+  plot(document.getElementById("p1"), es, pts.length, v[k], e, "errores según " + NAMES[k], "#555", true);
+  plot(document.getElementById("p2"), ls, 6, v[k], l, "costo (BCE) según " + NAMES[k], "#2b6cb0");
+}
+
+function set(v) { S.forEach((s, i) => s.value = v[i]); draw(); }
+S.forEach(s => s.addEventListener("input", draw));
+document.getElementById("cut").addEventListener("change", draw);
+document.getElementById("r0").onclick = () => set(INIT);
+document.getElementById("r1").onclick = () => set(OPT);
+set(INIT);
+</script>
+</body>
+</html>
