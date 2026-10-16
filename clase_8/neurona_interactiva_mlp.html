@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MLP: mové los pesos</title>
+<style>
+:root { --ink:#111; --bg:#fff; --muted:#666; --bad:#c0392b; --ok:#1e7e34; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ink:#eee; --bg:#111; --muted:#aaa; --bad:#ff6b5b; --ok:#5fd37a; } }
+body { margin:0; background:var(--bg); color:var(--ink); font-family:"STIX Two Text",Georgia,serif; }
+.wrap { display:flex; flex-wrap:wrap; gap:28px; padding:20px 16px; max-width:1400px; margin:auto; align-items:flex-start; }
+canvas { background:#fff; }
+#c { width:min(640px,100%); height:auto; aspect-ratio:1; border:1px solid #bbb; }
+.panel { flex:1; min-width:360px; max-width:640px; }
+h1 { font-size:28px; margin:0 0 4px; font-weight:600; }
+.sub { color:var(--muted); font-size:19px; margin:0 0 8px; }
+.counts { display:flex; gap:32px; flex-wrap:wrap; }
+.count { font-size:32px; font-variant-numeric:tabular-nums; }
+.count span { font-weight:700; }
+.status { height:26px; font-size:19px; color:var(--muted); margin:6px 0; font-variant-numeric:tabular-nums; }
+.capa h2 { font-size:21px; margin:10px 0 4px; font-weight:600; }
+.fila { display:grid; align-items:center; gap:4px; margin-bottom:2px; }
+.fila .n { font-size:16px; color:var(--muted); }
+.fila input[type=range] { width:100%; min-width:0; margin:0; }
+button { font:inherit; font-size:20px; padding:4px 12px; margin:12px 10px 0 0; cursor:pointer; }
+.leyenda { font-size:18px; color:var(--muted); margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <canvas id="c" width="900" height="900"></canvas>
+  <div class="panel">
+    <h1>Un MLP con muchos pesos</h1>
+    <p class="sub" id="sub"></p>
+    <div class="counts">
+      <div class="count">Errores: <span id="err"></span> de <span id="tot"></span></div>
+      <div class="count">Costo (BCE): <span id="bce"></span></div>
+    </div>
+    <div class="status" id="st"></div>
+    <div id="capas"></div>
+    <button id="r0">Pesos entrenados</button><button id="r1">Perturbar</button>
+    <div class="leyenda">Cada slider está centrado en su valor entrenado (±3). Línea negra = frontera. Anillo = mal clasificado.</div>
+  </div>
+</div>
+<script>
+const D = {"X0": [[1.87, -5.34], [-0.89, -1.97], [-2.37, -1.37], [-5.03, -1.39], [-3.07, 4.65], [-1.22, -1.6], [-2.08, -2.14], [-3.39, -1.66], [-0.78, -1.41], [0.03, -1.34], [-1.56, 1.63], [-0.67, -1.86], [-1.91, -0.08], [1.69, -1.46], [-2.01, 0.7], [-3.11, -1.5], [-0.1, -0.01], [-1.44, 0.14], [-6.41, 0.74], [-3.23, -3.84], [-1.13, 0.19], [-2.36, -2.83], [-1.56, -1.09], [0.79, 0.27], [-1.27, 0.89], [-1.95, -2.57], [-0.61, -0.01], [-1.97, -2.33], [-1.21, -5.24], [-0.43, -0.16], [-4.39, -0.9], [-3.24, 0.29], [-5.06, -2.55], [-0.39, 0.97], [-5.27, -1.85], [-1.04, -2.04], [1.1, -3.03], [-1.0, -2.78], [0.79, -1.04], [-2.23, -3.92]], "X1": [[4.46, 2.48], [2.88, 3.13], [2.19, 0.11], [0.24, -0.16], [3.93, -1.28], [0.59, 0.65], [1.98, 2.18], [-0.52, -1.74], [1.59, 3.26], [2.89, 1.57], [1.06, 1.7], [1.19, 2.59], [0.25, 1.43], [1.41, 2.12], [1.98, 5.54], [4.15, 3.74], [-1.87, 0.62], [0.57, 2.11], [-2.27, 3.2], [3.41, -1.01], [-0.06, -0.16], [1.67, 2.29], [5.08, 0.86], [2.9, 1.46], [4.59, 2.46], [3.93, -0.63], [1.27, -0.18], [4.16, 2.32], [1.08, 0.43], [2.42, 0.01], [0.02, 2.02], [5.79, 0.78], [0.66, -0.79], [-0.67, 2.09], [3.05, 1.22], [2.17, 1.4], [1.84, -1.39], [0.82, 1.39], [0.27, 0.39], [0.21, 0.63]]};
+const T = [{"W": [[-9.25, -3.950000047683716], [2.940000057220459, 1.7100000381469727], [1.409999966621399, -3.7799999713897705], [-2.630000114440918, -2.4700000286102295], [-4.150000095367432, 2.2899999618530273], [1.809999942779541, 4.809999942779541]], "b": [-9.079999923706055, -2.700000047683716, -5.150000095367432, 1.7300000190734863, 0.20999999344348907, 0.8999999761581421]}, {"W": [[0.3700000047683716, -2.0799999237060547, -0.3400000035762787, 1.2699999809265137, -1.8200000524520874, -0.14000000059604645], [3.319999933242798, 4.949999809265137, -5.260000228881836, -1.7000000476837158, -7.199999809265137, 4.53000020980835], [-0.5799999833106995, 1.6200000047683716, -2.119999885559082, -0.8500000238418579, -5.53000020980835, 1.1299999952316284], [-0.14000000059604645, 0.8399999737739563, 0.019999999552965164, -0.5600000023841858, 1.0700000524520874, 0.4399999976158142], [1.4800000190734863, -2.069999933242798, -0.2199999988079071, -1.1799999475479126, -3.1600000858306885, -0.49000000953674316], [3.180000066757202, -2.440000057220459, -1.0700000524520874, -1.059999942779541, -2.819999933242798, 5.320000171661377]], "b": [0.41999998688697815, 5.349999904632568, 1.0399999618530273, -2.6700000762939453, -1.1699999570846558, -5.579999923706055]}, {"W": [[-1.5099999904632568, 6.570000171661377, 2.5199999809265137, 1.340000033378601, -2.1700000762939453, -5.889999866485596]], "b": [-3.859999895095825]}];
+const pts = D.X0.map(p => ({x:p[0], y:p[1], c:0})).concat(D.X1.map(p => ({x:p[0], y:p[1], c:1})));
+const R = 7, N = 160, SPAN = 3;
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const W = cv.width, H = cv.height;
+const px = x => (x + R) / (2*R) * W;
+const py = y => (R - y) / (2*R) * H;
+const fmt = (v, d = 2) => v.toFixed(d).replace(".", ",").replace("-", "−");
+
+const sizes = [2].concat(T.map(l => l.b.length));
+const sliders = [];
+const cur = T.map(l => ({W: l.W.map(r => r.slice()), b: l.b.slice()}));
+
+function forward(x, y) {
+  let h = [x, y];
+  for (let l = 0; l < cur.length; l++) {
+    const L = cur[l], o = new Array(L.b.length);
+    for (let j = 0; j < o.length; j++) {
+      let s = L.b[j];
+      for (let k = 0; k < h.length; k++) s += L.W[j][k] * h[k];
+      o[j] = l < cur.length - 1 ? Math.tanh(s) : s;
+    }
+    h = o;
+  }
+  return h[0];
+}
+
+function mix(a, b, t) { return a.map((v, i) => Math.round(v + (b[i] - v) * t)); }
+function cmap(s) {
+  const lo = [59, 76, 192], mid = [221, 221, 221], hi = [180, 4, 38];
+  return s < 0.5 ? mix(lo, mid, s / 0.5) : mix(mid, hi, (s - 0.5) / 0.5);
+}
+
+const heat = document.createElement("canvas");
+heat.width = heat.height = N;
+const hctx = heat.getContext("2d");
+const Z = new Float64Array(N * N);
+
+function draw() {
+  const img = hctx.createImageData(N, N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const x = -R + i / (N - 1) * 2*R, y = R - j / (N - 1) * 2*R;
+    const z = forward(x, y);
+    Z[j*N + i] = z;
+    const [r, g, b] = cmap(1 / (1 + Math.exp(-z)));
+    const k = 4 * (j*N + i);
+    img.data[k] = r; img.data[k+1] = g; img.data[k+2] = b; img.data[k+3] = 150;
+  }
+  hctx.putImageData(img, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(heat, 0, 0, W, H);
+
+  ctx.strokeStyle = "#000"; ctx.lineWidth = 5; ctx.lineCap = "round"; ctx.beginPath();
+  const gx = i => px(-R + i / (N - 1) * 2*R), gy = j => py(R - j / (N - 1) * 2*R);
+  for (let j = 0; j < N - 1; j++) for (let i = 0; i < N - 1; i++) {
+    const v = [Z[j*N+i], Z[j*N+i+1], Z[(j+1)*N+i+1], Z[(j+1)*N+i]];
+    const P = [[i, j], [i+1, j], [i+1, j+1], [i, j+1]];
+    const q = [];
+    for (let k = 0; k < 4; k++) {
+      const a = v[k], b = v[(k+1) % 4];
+      if ((a > 0) !== (b > 0)) {
+        const t = a / (a - b), A = P[k], B = P[(k+1) % 4];
+        q.push([gx(A[0] + (B[0] - A[0]) * t), gy(A[1] + (B[1] - A[1]) * t)]);
+      }
+    }
+    for (let m = 0; m + 1 < q.length; m += 2) { ctx.moveTo(q[m][0], q[m][1]); ctx.lineTo(q[m+1][0], q[m+1][1]); }
+  }
+  ctx.stroke();
+
+  let wrong = 0, loss = 0;
+  for (const p of pts) {
+    const z = forward(p.x, p.y);
+    const bad = (z > 0 ? 1 : 0) !== p.c;
+    if (bad) wrong++;
+    loss += Math.max(z, 0) + Math.log1p(Math.exp(-Math.abs(z))) - p.c * z;
+    ctx.beginPath(); ctx.arc(px(p.x), py(p.y), 10, 0, 2*Math.PI);
+    ctx.fillStyle = p.c ? "rgba(214,39,40,0.9)" : "rgba(31,119,180,0.9)";
+    ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#000"; ctx.stroke();
+    if (bad) { ctx.beginPath(); ctx.arc(px(p.x), py(p.y), 17, 0, 2*Math.PI); ctx.lineWidth = 5; ctx.stroke(); }
+  }
+  loss /= pts.length;
+  const e = document.getElementById("err");
+  e.textContent = wrong; e.style.color = wrong === 0 ? "var(--ok)" : "var(--bad)";
+  document.getElementById("tot").textContent = pts.length;
+  document.getElementById("bce").textContent = fmt(loss, loss < 0.1 ? 3 : 2);
+}
+
+function build() {
+  const box = document.getElementById("capas");
+  let total = 0;
+  T.forEach((L, l) => {
+    const sec = document.createElement("div"); sec.className = "capa";
+    const nombre = l === T.length - 1 ? "Salida" : "Capa oculta " + (l + 1);
+    sec.innerHTML = "<h2>" + nombre + " (" + sizes[l] + " → " + sizes[l+1] + ")</h2>";
+    L.b.forEach((_, j) => {
+      const fila = document.createElement("div"); fila.className = "fila";
+      fila.style.gridTemplateColumns = "26px repeat(" + (sizes[l] + 1) + ", 1fr)";
+      fila.innerHTML = '<span class="n">n' + (j + 1) + "</span>";
+      for (let k = 0; k <= sizes[l]; k++) {
+        const isB = k === sizes[l];
+        const t = isB ? L.b[j] : L.W[j][k];
+        const s = document.createElement("input");
+        s.type = "range"; s.min = t - SPAN; s.max = t + SPAN; s.step = 0.01; s.value = t;
+        const lab = nombre + ", n" + (j + 1) + (isB ? ", sesgo b" : ", peso w" + (k + 1));
+        s.dataset.l = l; s.dataset.j = j; s.dataset.k = k; s.dataset.t = t; s.dataset.lab = lab;
+        const show = () => { document.getElementById("st").textContent = lab + " = " + fmt(+s.value) + "  (entrenado " + fmt(t) + ")"; };
+        s.addEventListener("input", () => { setP(l, j, k, +s.value); show(); draw(); });
+        s.addEventListener("pointerenter", show);
+        fila.appendChild(s); sliders.push(s); total++;
+      }
+      sec.appendChild(fila);
+    });
+    box.appendChild(sec);
+  });
+  document.getElementById("sub").textContent = sizes.join("-") + ", tanh en las ocultas, σ a la salida. " + total + " parámetros.";
+}
+
+function setP(l, j, k, v) { if (k === sizes[l]) cur[l].b[j] = v; else cur[l].W[j][k] = v; }
+function applyAll(f) {
+  sliders.forEach(s => { const v = f(+s.dataset.t); s.value = v; setP(+s.dataset.l, +s.dataset.j, +s.dataset.k, +s.value); });
+  draw();
+}
+function gauss() { return Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random()); }
+
+build();
+document.getElementById("r0").onclick = () => { applyAll(t => t); document.getElementById("st").textContent = ""; };
+document.getElementById("r1").onclick = () => { applyAll(t => t + 0.4 * gauss()); document.getElementById("st").textContent = ""; };
+draw();
+</script>
+</body>
+</html>
