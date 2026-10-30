@@ -150,8 +150,8 @@ def correr_red_per(semilla, eps=EPS, T=T, k=K, pasos=PASOS_POR_TIRO, guardar_cua
     return historial, params, cuadros
 
 
-# %% 4. Comparación semilla 5: uniforme queda atrapada, ¿PER la rescata?
-SEMILLA_DEMO = 5
+# %% 4. Comparación semilla 1: uniforme queda atrapada, ¿PER la rescata?
+SEMILLA_DEMO = 1
 historial_uniforme, params_uniforme = correr_red_uniforme(SEMILLA_DEMO)
 historial_per, params_per, cuadros_per = correr_red_per(SEMILLA_DEMO, guardar_cuadros=True)
 print(f"uniforme, ultimos 500: theta promedio={historial_uniforme[-500:].mean():.3f}")
